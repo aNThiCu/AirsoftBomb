@@ -28,11 +28,12 @@ int count = 2;
 int phase = 0;
 int hr = 0, min = 0, sec = 0;
 int passhr, passmin, passsec;
-int code = 0;
+long int code = 0;
 unsigned long int currentTime = 0;
 unsigned long int startTime = 0;
-unsigned long int buzzTime=0;
+unsigned long int buzzTime = 0;
 int timeSec;  //time in seconds
+long int armingCode = 0;
 
 void setup() {
   pinMode(2, OUTPUT);
@@ -44,6 +45,7 @@ void setup() {
   lcd.print("00 : 00 : 00");
   lcd.setCursor(2, 1);
   lcd.blink();
+  Serial.begin(9600);
 }
 
 void getTime() {
@@ -106,12 +108,17 @@ void printTime() {
 }
 
 void menuTwo() {
+  randomSeed(analogRead(A6));
+  armingCode = random(10000, 100000);
   lcd.clear();
   printTime();
-  lcd.print("-->25641");
+  lcd.print("-->");
+  lcd.print(armingCode);
   lcd.setCursor(0, 1);
   lcd.print("ENTER CODE:");
-  passhr=hr;passmin=min;passsec=sec;
+  passhr = hr;
+  passmin = min;
+  passsec = sec;
   timeSec = passhr * 3600 + passmin * 60 + passsec;
   phase = 2;
 }
@@ -128,7 +135,7 @@ void getCode() {
 
 int confirmCode() {
   if (code / 10000 != 0) {
-    if (code == 25641) {
+    if (code == armingCode)
       switch (phase) {
         case 2:
           phase = 3;
@@ -137,7 +144,7 @@ int confirmCode() {
           phase = 5;
           break;
       }
-    } else {
+    else {
       lcd.setCursor(11, 1);
       lcd.print("     ");
       lcd.setCursor(11, 1);
@@ -151,7 +158,8 @@ void menuThree() {
   lcd.setCursor(4, 0);
   printTime();
   lcd.setCursor(0, 1);
-  lcd.print("25641----->");
+  lcd.print(armingCode);
+  lcd.print("----->");
   currentTime = millis();
   startTime = millis();
   code = 0;
@@ -193,8 +201,6 @@ void updateTime() {
   updateHMS();
 }
 
-
-
 void toggleSL() {
   int timeNow = (hr * 3600) + (min * 60) + sec;
   int dela = map(timeNow, 0, timeSec, 0, 5000);
@@ -203,10 +209,42 @@ void toggleSL() {
     analogWrite(11, 50);
     digitalWrite(2, HIGH);
   }
-  if (dela >= 50 && millis() - buzzTime >= 50 && digitalRead(3)==HIGH) {
+  if (dela >= 50 && millis() - buzzTime >= 50 && digitalRead(3) == HIGH) {
     analogWrite(11, 0);
     digitalWrite(2, LOW);
   }
+}
+
+void timeFinish() {
+  if (hr == -1)
+    phase = 6;
+}
+
+void resetTime() {
+  hr = passhr;
+  min = passmin;
+  sec = passsec;
+  code = 0;
+}
+
+void explosion() {
+  analogWrite(11, 50);
+  digitalWrite(2, HIGH);
+  delay(3000);
+  analogWrite(11, 0);
+  digitalWrite(2, LOW);
+  resetTime();
+  phase = 1;
+  code = 0;
+}
+
+void bombDefused() {
+  lcd.clear();
+  digitalWrite(2, LOW);
+  analogWrite(11, 0);
+  resetTime();
+  phase = 1;
+  code = 0;
 }
 
 void loop() {
@@ -231,14 +269,13 @@ void loop() {
       getCode();
       confirmCode();
       toggleSL();
+      timeFinish();
       break;
     case 5:
-      lcd.clear();
-      digitalWrite(2, LOW);
-      analogWrite(11, 0);
-      hr=passhr;min=passmin;sec=passsec;
-      code = 0;
-      phase = 1;
+      bombDefused();
+      break;
+    case 6:
+      explosion();
       break;
   }
 }
